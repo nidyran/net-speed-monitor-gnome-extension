@@ -1,0 +1,15 @@
+{
+    "name" : "net speed monitor",
+    "description" : "Gnome extension mainly built to track network speed.",
+    "shell-version" : [
+        "3.34",
+        "3.32",
+        "3.36",
+        "3.38",
+        "40",
+        "41"
+    ],
+    "url" : "https://github.com/nidyran/netSpeedMonitor/",
+    "uuid" : "netspeedmonitor",
+    "version" : 1.0
+}
