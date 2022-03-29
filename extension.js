@@ -4,21 +4,25 @@ const Main = imports.ui.main;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 
-//Global variables
-let oldTotalRecieveAmount = 0, oldTotalTransmitAmount = 0,mode = 3;
-let panelButton,panelButtonLabel,timeout;
-let selectedSourceIndex = 0, availableSources;
-
-//Flags
-let sourceLock = false;
-let debugStatus = false;
-
 //Constants
 const NO_SOURCES_FOUND_MESSAGE = "NO_SOURCE";
 const DEBUG_PREFIX = "netSpeedMonitorDebug";
 const STARTING_MESSAGE = "netSpeedMonitor";
 const SOURCE_PATH = "/proc/net/dev";
-const REFRESH_TIME = 750;
+
+const MAX_REFRESH_RATE = 1000;
+const MIN_REFRESH_RATE = 200;
+const REFRESH_RATE_STEP = 100;
+
+//Global variables
+let oldTotalRecieveAmount = 0, oldTotalTransmitAmount = 0,mode = 3;
+let panelButton,panelButtonLabel,timeout;
+let selectedSourceIndex = 0, availableSources;
+let refreshTime = MIN_REFRESH_RATE;
+
+//Flags
+let sourceLock = false;
+let debugStatus = true;
 
 function init () {
 }
@@ -31,21 +35,29 @@ function enable () {
     Main.panel._rightBox.insert_child_at_index(panelButton, 0);
 
     loadAvailableSources();
-    timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, REFRESH_TIME, () => {return refresh();});
+    startTimer();
 }
 
-function disable () {
+function startTimer(){
+    timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, refreshTime, () => {return refresh();});
+}
+
+function stopTimer(){
     if (timeout) {
         GLib.Source.remove(timeout);
         timeout = null;
     }
+}
+
+function disable () {
+    stopTimer();
     Main.panel._rightBox.remove_child(panelButton);
     panelButton.destroy();
-    panelButton = label = null;
+    panelButton = null;
 }
 
 function refresh(){
-    var values = readFromFile();
+    var values = loadDataUsage();
 
     totalRecieve = values[0];
     totalTransmit = values[1];
@@ -55,7 +67,6 @@ function refresh(){
         switchSource();
     }
     else if(oldTotalRecieveAmount != 0 && oldTotalTransmitAmount != 0){
-
         if(mode == 0){
             //Download speed
             result = "↓ " + stringifyBytes(calculateSpeed(totalRecieve, oldTotalRecieveAmount)) + "/s";
@@ -77,7 +88,7 @@ function refresh(){
 
     oldTotalRecieveAmount = totalRecieve;
     oldTotalTransmitAmount = totalTransmit;
-
+    
     return GLib.SOURCE_CONTINUE;
 }
 
@@ -85,10 +96,11 @@ function calculateSpeed(value, oldValue){
     if(value == null || oldValue == null || value == 0 || oldValue == 0 || value == oldValue){
         return 0;
     }
-    return (value - oldValue)/(REFRESH_TIME/1000);
+    let result = (value - oldValue)/(refreshTime/1000);
+    return result;
 }
 
-function readFromFile(){
+function loadDataUsage(){
     try{
         let sourceFile = Gio.file_new_for_path(SOURCE_PATH);
         let sourceFileStream = sourceFile.read(null);
@@ -150,17 +162,33 @@ function loadAvailableSources(){
 function handleButtonClickEvent(widget, event){
     if(event.get_button() == 1){
         switchMode();
-    }else if(event.get_button()){
+    }else if(event.get_button() == 2){
+        switchRefreshRate();
+    }else if(event.get_button() == 3){
         switchSource();
         sourceLock = true;
     }
 }
+
+function switchRefreshRate(){
+    if(refreshTime == MAX_REFRESH_RATE){
+        refreshTime = MIN_REFRESH_RATE;
+    } else{
+        refreshTime = refreshTime + REFRESH_RATE_STEP;
+    }
+    display("Timer: "+refreshTime+"/"+MAX_REFRESH_RATE);
+
+    stopTimer();
+    startTimer();
+}
+
 function switchMode(){
     if(mode == 4){
         mode = 0;
     }else{
         mode = mode + 1;
     }
+    display("Mode: "+mode+"/4");
 }
 
 function switchSource(){
@@ -172,7 +200,7 @@ function switchSource(){
         } else{
             selectedSourceIndex = selectedSourceIndex + 1;
         }
-        display(availableSources[selectedSourceIndex]+" - "+selectedSourceIndex+"/"+(availableSources.length - 1));
+        display("Source: "+selectedSourceIndex+"/"+(availableSources.length - 1));
     }
     oldTotalRecieveAmount = 0;
     oldTotalTransmitAmount = 0;
