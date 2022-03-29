@@ -11,7 +11,7 @@ let selectedSourceIndex = 0, availableSources;
 
 //Flags
 let sourceLock = false;
-let debugStatus = true;
+let debugStatus = false;
 
 //Constants
 const NO_SOURCES_FOUND_MESSAGE = "NO_SOURCE";
@@ -36,7 +36,7 @@ function enable () {
 
 function disable () {
     if (timeout) {
-        GLib.selectedSourceIndex_remove(timeout);
+        GLib.Source.remove(timeout);
         timeout = null;
     }
     Main.panel._rightBox.remove_child(panelButton);
